@@ -4,7 +4,9 @@ const fs = require('fs'),
   path = require('path'),
   pug = require('pug'),
   xss = require('xss'),
-  ini = require('ini');
+  cookie = require('cookie'),
+  ini = require('ini'),
+  http = require('http');
 
 module.exports = {
   prepare(callback) {
@@ -27,6 +29,7 @@ module.exports = {
 
 const security = require('./security');
 const dbConnect = require('./dbConnect');
+
 
 const responseErrorMessages = {
   306: ['Unknown error',
@@ -158,6 +161,67 @@ function route(request, response) {
         if (fs.existsSync(filePathInPrivateData)) {
           stat = fs.statSync(filePathInPrivateData);
           if (stat.isFile()) {
+            const db = dbConnect.getDB();
+            //const ObjectID = require('mongodb').ObjectID;
+            let fileInfo = {};
+            db.collection('users').findOne(
+              { _id: sessionData.id },
+              { group: 1, securityRole: 1 },
+              (err, user) => {
+                if (err) console.log(err);
+                let group = '';
+                group = user.securityRole[0];
+                if (user.group) group = user.group;
+                db.collection('groups').findOne(
+                  { _id: group },
+                  { url: 1 },
+                  (err, groupURL) => {
+                    if (err) console.log(err);
+                    if (groupURL) group = groupURL.url;
+
+                    fileInfo.userGroup = group;
+                    const fileID = requestedURL.split('/').pop();
+                    fileInfo.fileID = fileID;
+                    console.log(fileID);
+                    db.collection('disciplines').findOne(
+                      { files: fileID },
+                      { allias: 1 },
+                      (err, discipline) => {
+                        if (err) console.log(err);
+                        fileInfo.discipline = discipline.allias;
+                        fileInfo.downloadDate = Date.now();
+                        const rawCookies = request.headers.cookie;
+                        const cookies = cookie.parse(rawCookies);
+                        fileInfo.uniqueID = cookies['uniqueID'];
+                        fileInfo.visitID = cookies['visitID'];
+                        fileInfo.isArchive = false;
+                        fileInfo.referrer = 'Empty';
+                        if (request.headers.referer)
+                            fileInfo.referrer = request.headers.referer;
+                        console.log(`\n User STAT:
+                          ${JSON.stringify(fileInfo)}`);
+
+                        const options = {
+                          hostname: 'localhost',
+                          port: 5000,
+                          path: '/files',
+                          method: 'POST',
+                        };
+
+                        const req = http.request(options, res => {
+                          console.log(`statusCode: ${res.statusCode}`);
+                        })
+
+                        req.on('error', error => {
+                          console.error(error)
+                        });
+
+                        req.write(JSON.stringify(fileInfo));
+                        req.end();
+                    });
+                  });
+              });
+
             return stream(filePathInPrivateData, stat, request, response);
           } else {
             return bleed(404, requestedURL, response);
