@@ -1,0 +1,58 @@
+doctype html
+html
+  head
+    title #{title}
+    include includes/head_html.pug
+    link(rel='stylesheet', href='/assets/libs/fortawesome/fontawesome-free/css/all.min.css')
+    link(rel='stylesheet', href='/assets/libs/datepicker/datepicker-bs4.min.css')
+  body
+    .footer-wrapper
+      include includes/header_private.pug
+      section.pt-6
+        .container.pb-3
+          .row.row-grid.align-items-center
+            .col-xl-8.col-lg-10.offset-xl-2.offset-lg-1
+              article.text-justify
+                h5.h3.text-center #{discName}: Скачанные файлы
+        .container.pb-3.align-items-center.text-center
+            #range
+              label.h5 Период c
+              input#start(type='text' name="start" value=start)
+              label.h5 по
+              input#end(type='text' name="end" value=end)
+              button.btn.btn-sm.btn-outline-primary#analyze(name='analyze')
+                |Показать
+        .container
+          .row.justify-content-center
+            .col-xl-9.col-lg-10
+              h4 Скачивания файлов дисциплины по дням
+              canvas#distribution
+              h4 Топ скачиваний за период
+              .card
+                ul#top.list-group.list-group-flush
+                  li.list-group-item
+                    .row
+                      b.col-6
+                        | Имя файла
+                      b.col-3
+                        | Скачивания
+                      b.col-3.d-none.d-md-block
+                        | В составе архива
+      .push
+    include includes/footer.pug
+    script.
+      let files = !{JSON.stringify(discFiles)}
+    script(src='/assets/libs/chart/chart.min.js')
+    script(src='/assets/libs/datepicker/datepicker-full.min.js')
+    script(src='/assets/libs/datepicker/ru.js')
+    script(src='/createDatePicker.js')
+    script(src='/get_disc_files_analytics.js')
+    script(src='/assets/libs/jquery/dist/jquery.min.js')
+    script(src='/assets/libs/svg-injector/dist/svg-injector.min.js')
+    script(src='/assets/libs/feather-icons/dist/feather.min.js')
+    script.
+      feather.replace({
+      width: "1em",
+      height: "1em"
+      })
+    include includes/yandex_metrika.pug
