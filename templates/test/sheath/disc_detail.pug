@@ -30,6 +30,7 @@ html
       .fixed-rows-footer{
         margin-top: 250px;
       }
+    link(rel='stylesheet', href='../../survey.css')
     link(rel='stylesheet', href='../../assets/libs/swiper/dist/css/swiper.min.css')
     link(rel='stylesheet', href='../../assets/libs/fancyapps/fancybox/dist/jquery.fancybox.min.css')
     link(rel='stylesheet', href='../../assets/libs/fortawesome/fontawesome-free/css/all.min.css')
@@ -47,7 +48,9 @@ html
               p.lead.lh-190 #{discipline.description}
           if (userInfo.securityRole.includes("superadmin") || (userInfo.securityRole.includes("teacher") && discipline.editors.includes(userInfo._id.toString())))
             .row.justify-content-center.mb-3
-              a.mr-1(href="/disciplines/edit/"+discipline.allias+"/")
+              a.mr-1(href="/analytics/"+discipline.allias+"/")
+                button.btn.btn-outline-success(type='button') Аналитика
+              a.mx-1(href="/disciplines/edit/"+discipline.allias+"/")
                 button.btn.btn-outline-primary(type='button') Редактировать
               a.ml-1(href="/disciplines/delete/"+discipline.allias+"/")
                 button.btn.btn-outline-danger(type='button') Удалить
@@ -98,6 +101,8 @@ html
                                   i(data-feather='edit')
                                 a.action-item.mr-2(href="/file/delete/"+discipline.allias+"/"+file._id+"/")
                                   i(data-feather='trash-2')
+                                a.action-item.mr-2(href="/analytics/"+discipline.allias+"/file/"+file._id+"/")
+                                  i(data-feather='pie-chart')
                     else 
                       br
                       li.list-group-item
@@ -105,7 +110,10 @@ html
                           .col-auto
                            p Документов пока нет      
       .push
-    include includes/footer.pug 
+    include includes/footer.pug
+    //script(src="../../timeme.min.js" type="text/javascript") 
+    script(src="../../smarty-pants.min.js" type="text/javascript")  
+    script(src="../../disc-survey.min.js" type="text/javascript") 
     script(src="../../checkbox_select_all.js" type="text/javascript")
     script(src='../../assets/libs/jquery/dist/jquery.min.js')
     script(src='../../assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js')

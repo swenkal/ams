@@ -31,11 +31,14 @@ section.slice.py-5.bg-section-secondary
           each disc in teacherDisciplines  
             .col-sm-6.col-lg-4.px-2
               .card.mb-3(style="min-width: 175px; min-height: 150px")
-                a.action-item.mr-2(href=urlDiscDetail+disc.allias+"/")
-                  .card-header.pb-3
-                    .d-flex.justify-content-between.align-items-center
-                      div
-                        h6.mb-0 #{disc.mnemo}
+                
+                .card-header.pb-3
+                  .d-flex.justify-content-between.align-items-center
+                    a.action-item.mr-2(href=urlDiscDetail+disc.allias+"/")
+                      h6.mb-0 #{disc.mnemo}
+                    a.action-item.mr-2(href="/analytics/"+disc.allias+"/")
+                      i(data-feather='bar-chart-2')
+                a.action-item.mr-2(href=urlDiscDetail+disc.allias+"/")  
                   .card-body.pt-0.pb-3.mb-0
                     .mt-1
                       p.mb-2.text-sm.text-muted #{disc.name}
