@@ -1,0 +1,82 @@
+doctype html
+html
+  head
+    title #{title}
+    include includes/head_html.pug
+    link(rel='stylesheet', href='../../assets/libs/fortawesome/fontawesome-free/css/all.min.css')
+    link(rel='stylesheet', href='../../assets/libs/datepicker/datepicker-bs4.min.css')
+  body
+    .footer-wrapper
+      include includes/header_private.pug
+      section.pt-6
+        .container.pb-3
+          .row.row-grid.align-items-center
+            .col-xl-8.col-lg-10.offset-xl-2.offset-lg-1
+              article.text-justify
+                h5.h3.text-center #{discName}
+        .container.pb-3.align-items-center.text-center
+            #range
+              label.h5 Период c
+              input#start(type='text' name="start" value=start)
+              label.h5 по
+              input#end(type='text' name="end" value=end)
+              button.btn.btn-sm.btn-outline-primary#analyze(name='analyze')
+                |Показать
+        .container
+          .row
+            .col-6
+              article.text-justify
+                a#filesLink
+                  h4.text-center Скачанных файлов
+                  h1#downloads.text-center 45
+            .col-6
+              article.text-justify
+                h4.text-center Уникальные посетители
+                h1#unique.text-center 120
+        .container
+          .row
+            .col-6
+              article.text-justify
+                h4.text-center Показатель отказов
+                h1#bounce.text-center 13%
+            .col-6
+              article.text-justify
+                h4.text-center Просмотры
+                h1#views.text-center 310
+        .container
+          h4.text-center Результаты опросов
+          .row
+            .col-6
+              article.text-justify
+                b.text-center Насколько были понятны материалы данной дисциплины?
+                canvas#q1
+            .col-6
+              article.text-justify
+                b.text-center Какой информации по дисциплине Вам не хватает?
+                canvas#q2
+          .row.mt-5
+            .col-6
+              article.text-justify
+                b.text-center Встретились ли Вам ошибки/недочеты на данной странице?
+                canvas#q3
+            .col-6
+              article.text-justify 
+                b.text-center Подскажите, что можно исправить/улучшить на данной странице?
+                ul#suggest.list-group.list-group-flush
+
+      .push
+    include includes/footer.pug
+    script(src='../../assets/libs/chart/chart.min.js')
+    script(src='../../assets/libs/datepicker/datepicker-full.min.js')
+    script(src='../../assets/libs/datepicker/ru.js')
+    script(src='../../createDatePicker.js')
+    script(src='../../get_disc_analytics.js')
+    script(src='../../assets/libs/jquery/dist/jquery.min.js')
+    script(src='../../assets/libs/svg-injector/dist/svg-injector.min.js')
+    script(src='../../assets/libs/feather-icons/dist/feather.min.js')
+    script.
+      feather.replace({
+      width: "1em",
+      height: "1em"
+      })
+    include includes/yandex_metrika.pug
