@@ -2,9 +2,9 @@ doctype html
 html
   head
     title #{title}
+    link(rel='stylesheet' href='../../../assets/libs/trix/trix.css')
     include includes/head_html.pug
     link(rel='stylesheet', href='../../assets/libs/fortawesome/fontawesome-free/css/all.min.css')
-    link(rel='stylesheet' href='../../../assets/libs/trix/trix.css')
     style.
       blockquote {
       border: 0 solid #ccc;
@@ -59,19 +59,16 @@ html
                             span.text-sm.text-muted Опубликовано: #{newsDetail.formatedDate}
       section.slice.slice-lg.pt-10.pb-5
         .container.pb-6
-          .row.row-grid.align-items-center
-            .col-xl-8.col-lg-10.offset-xl-2.offset-lg-1
-              |!{newsDetail.text}
+          .row.justify-content-center
+            .col-8
+              .trix-content
+                |!{newsDetail.text}
       .push
-    include includes/footer.pug                
+    include includes/footer.pug               
     script(src='../../assets/libs/jquery/dist/jquery.min.js')
     script(src='../../assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js')
     script(src='../../assets/libs/svg-injector/dist/svg-injector.min.js')
     script(src='../../assets/libs/feather-icons/dist/feather.min.js')
-    script(src='../../assets/libs/in-view/dist/in-view.min.js')
-    script(src='../../assets/libs/sticky-kit/dist/sticky-kit.min.js')
-    script(src='../../assets/libs/imagesloaded/imagesloaded.pkgd.min.js')
-    script(src='../../assets/js/quick-website.js')
     script.
       feather.replace({
       width: "1em",
