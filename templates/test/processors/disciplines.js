@@ -1,71 +1,41 @@
-const qs = require('querystring'),
-      router = require('../../../router');
+const check = require('./common/permission_check.js'),
+      bw = require('./common/bleed_wrapper.js'),
+      dbMethods = require('./disciplines/dbMethods.js'),
+      funcs = require('./disciplines/funcs.js');
 
 module.exports = {
   path: new RegExp('^\/disciplines\/$'),
-  processor(request, response, callback, sessionContext, sessionToken, db){
-    if( sessionContext == undefined || sessionContext == null || sessionContext['id'] == undefined) {
-      callback();
-      return router.bleed(301, '/login/', response);
-    }
-    db.collection('disciplines').aggregate([
-      {
-        $lookup:
-        {
-          from: 'groups',
-          let: { groups: '$groups'},
-          pipeline: [
-            { $match:
-              {$expr:
-                { $in: [ {$toString: '$_id'}, '$$groups' ]}
-              }
-            },
-            { $project: {_id: 0, fullname: 1, name: 1, course: 1, typeEducation: 1}},
-          ],
-          as: 'groupsInfo'
-        }
-      },
-        {
-          $lookup:
-            {
-              from: 'users',
-              let: { editors: '$editors'},
-              pipeline: [
-                { $match:
-                   {$expr:
-                    { $in: [ {$toString: '$_id'}, '$$editors' ]}
-                   }
-                },
-                { $project: {_id: 0, lastName: 1, name: 1, fatherName: 1}},
-              ],
-              as: 'editorsInfo'
-            }
-         },
-    ]).sort({name: 1}).toArray((err, result) => {
-      if(err) {
-        callback();
-        router.bleed(500, null, response, err);
-      }
+  processor(request, response, callback, sessionContext, sessionToken, db) {
+
+    const userAuthed = check.isUserAuthed(sessionContext, sessionToken);
+    if (!userAuthed) return bw.redirectToLoginPage(response, callback);
+
+    dbMethods.aggregateDisciplinesWithEditorsAndGroups(db, (err, result) => {
+
+      if (err) return bw.redirectTo500Page(response, err, callback);
+
       const disciplines = result;
-      db.collection('users').findOne(
-        { _id: sessionContext.id },
-        { securityRole : 1, username : 1, group: 1 },
-      (err, result) => {
-        if(err) {
-          callback();
-          return router.bleed(500, null, response, err);
-        }
-        let userInfo = result;
-        if(userInfo.securityRole.length !== 0 && userInfo.securityRole.includes('teacher')) {
+      dbMethods.getAllUserInfo(sessionContext.id, db, (err, result) => {
+
+        if (err) return bw.redirectTo500Page(response, err, callback);
+        const userInfo = result;
+
+        const userTeacher = check.isUserTeacher(userInfo);
+
+        if (userTeacher) {
           let teacherDisciplines = [],
               otherDisciplines = [];
-          for(let disc of disciplines) {
-            if(disc.editors !== undefined && disc.editors.includes(userInfo._id.toString())) {
+          for (let disc of disciplines) {
+            const editors = disc.editors;
+            const userID = userInfo._id.toString();
+
+            if (editors !== undefined && editors.includes(userID)) {
               teacherDisciplines.push(disc);
             } else {
               otherDisciplines.push(disc);
             }
           }
+
           return callback({
             title: 'Дисциплины',
             urlDiscDetail: '/disciplines/',
@@ -73,16 +43,25 @@ module.exports = {
             otherDisciplines: otherDisciplines,
             userInfo: userInfo
           }, 'disciplines', 0, 0);
-        } else if(userInfo.securityRole.length !== 0 && userInfo.securityRole.includes('student') && userInfo.group !== undefined) {
+        }
+
+        const userStudentWithGroup = check.isUserStudentWithGroup(userInfo);
+
+        if (userStudentWithGroup) {
+
           let studentDisciplines = [],
               otherDisciplines = [];
-          for(let disc in disciplines){
-            if(disciplines[disc].groups !== undefined && disciplines[disc].groups.includes(userInfo.group.toString())) {
-              studentDisciplines.push(disciplines[disc]);
+          for (let disc of disciplines) {
+            const groups = disc.groups;
+            const userGroup = userInfo.group.toString();
+
+            if (groups !== undefined && groups.includes(userGroup)) {
+              studentDisciplines.push(disc);
             } else {
-              otherDisciplines.push(disciplines[disc]);
+              otherDisciplines.push(disc);
             }
           }
+
           return callback({
             title: 'Дисциплины',
             urlDiscDetail: '/disciplines/',
@@ -90,15 +69,15 @@ module.exports = {
             otherDisciplines: otherDisciplines,
             userInfo: userInfo
           }, 'disciplines', 0, 0);
-        } else {
-          return callback({
-            title: 'Дисциплины',
-            urlDiscDetail: '/disciplines/',
-            disciplines: disciplines,
-            userInfo: userInfo
-          }, 'disciplines', 0, 0);
         }
-      });
-    });
+
+        return callback({
+          title: 'Дисциплины',
+          urlDiscDetail: '/disciplines/',
+          disciplines: disciplines,
+          userInfo: userInfo
+        }, 'disciplines', 0, 0);
+      }); // getRoleForAuthedUser
+    }); //aggregateDisciplinesWithEditorsAndGroups
   }
-}
+};

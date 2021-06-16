@@ -1,101 +1,75 @@
 const qs = require('querystring'),
-      router = require('../../../router'),
-      security = require('../../../security');
+  downloadClientPostData = require('../../../router').downloadClientPostData,
+  check = require('./common/permission_check.js'),
+  bw = require('./common/bleed_wrapper.js'),
+  dbMethods = require('./disciplines/dbMethods.js'),
+  funcs = require('./disciplines/funcs.js');
 
 module.exports = {
   path: new RegExp('^\/disciplines\/create\/$'),
-  processor: function(request, response, callback, sessionContext, sessionToken, db){
-    if(sessionToken == null || sessionContext == undefined || sessionContext == null){
-      callback();
-      return router.bleed(301, '/login/', response);
-    }
-    db.collection('users').findOne(
-      { _id : sessionContext.id },
-      { username : 1, securityRole: 1},
-      function(err, result) {
-      if(err) {
-        callback();
-        router.bleed(500, null, response, err);
-      }
+  processor(request, response, callback, sessionContext, sessionToken, db) {
+    const userAuthed = check.isUserAuthed(sessionContext, sessionToken);
+    if (!userAuthed) return bw.redirectToLoginPage(response, callback);
+
+    dbMethods.getRoleForAuthedUser(sessionContext.id, db, (err, result) => {
+
+      if (err) return bw.redirectTo500Page(response, err, callback);
       const userInfo = result;
-      if(userInfo.securityRole.length == 0 || (!userInfo.securityRole.includes('superadmin') && !userInfo.securityRole.includes('teacher'))) {
-        callback();
-        return router.bleed(403, null, response);
+
+      const userAdminOrTeacher = check.isUserAdminOrTeacher(userInfo);
+      if (!userAdminOrTeacher) {
+        const err = new Error('User role not admin or teacher');
+        return bw.redirectWithErrorCode(response, 403, err, callback);
       }
-      db.collection('groups').find().toArray(function(err, result) {
-        if(err) {
-          callback();
-          router.bleed(500, null, response, err);
-        }
+
+      dbMethods.getAllGroups(db, (err, result) => {
+
+        if (err) return bw.redirectTo500Page(response, err, callback);
         const groupsInfo = result;
-        db.collection('users').find({securityRole: 'teacher'}).toArray(function(err, result) {
-          if(err) {
-            callback();
-            router.bleed(500, null, response, err);
-          }
+
+        dbMethods.getAllTeachers(db, (err, result) => {
+
+          if (err) return bw.redirectTo500Page(response, err, callback);
           const teachersList = result;
-          if(request.method == 'POST') {
-            return router.downloadClientPostData(request, function(err, data) {
-              if(err) {
-                callback();
-                return router.bleed(400, null, response, err);
-              }
+
+          if (request.method == 'POST') {
+            //required from router.js for download Client Post Data
+            return downloadClientPostData(request, (err, data) => {
+              if (err) return bw.redirectTo400Page(response, callback);
+
               try {
                 const postData = qs.parse(data);
 
-                if(/[А-яЁё]/gi.test(postData.allias)) {
+                const errorMessage = funcs.checkDiscAllias(postData.allias);
+                if (errorMessage) {
                   return callback({
                     title: 'Новая дисциплина',
                     discipline: postData,
                     groupsInfo: groupsInfo,
                     teachersList: teachersList,
                     userInfo: userInfo,
-                    errorMessage: ' Имя ссылки(URL) должно быть на английском!'
+                    errorMessage: errorMessage
                   }, 'disc_form', 0, 0 );
                 }
-                if(/\/|http|@|:|ftp/gi.test(postData.allias)) {
-                  return callback({
-                    title: 'Новая дисциплина',
-                    discipline: postData,
-                    groupsInfo: groupsInfo,
-                    userInfo: userInfo,
-                    teachersList: teachersList,
-                    errorMessage: 'Неправильное имя ссылки(URL) для дисциплины!'
-                  }, 'disc_form', 0, 0 );
-                }
-                let editors = [];
-                if(userInfo.securityRole.includes('teacher')) {
-                  editors.push(userInfo._id.toString());
-                } else {
-                  editors = convertToArray(postData.editors);
-                }
-                db.collection('disciplines').insertOne({
-                  name: postData.name,
-                  mnemo: postData.mnemo,
-                  allias: postData.allias,
-                  description: postData.description,
-                  creator: userInfo._id.toString(),
-                  dateCreate: new Date(),
-                  dateUpdate: new Date(),
-                  lastEditor: userInfo._id.toString(),
-                  editors: editors,
-                  groups: convertToArray(postData.groups),
-                  files: []
-                }, function(err) {
-                  if(err) {
-                    callback();
-                    return router.bleed(500, null, response, err);
-                  }
+
+                //getting arrays for editors and groups
+                postData.editors = funcs.checkAndAddEditors(userInfo, postData);
+                postData.groups = funcs.convertToArray(postData.groups);
+
+                dbMethods.addDisciplineToDB(userInfo, postData, db, err => {
+
+                  if(err) return bw.redirectTo500Page(response, err, callback);
+
                   console.log(`Discipline ${postData.allias} created!`);
-                  callback();
-                  return router.bleed(301, '/disciplines/', response);
+                  return bw.redirectToDiscPage(response, callback);
                 });
-              } catch(err){
+
+              } catch(err) {
                 console.log(`Processor error disc_create: ${err}`);
-                callback();
-                return router.bleed(500, null, response, err);
+                return bw.redirectTo500Page(response, err, callback);
               }
-            }, 10000000);
+            }); // downloadClientPostData
+          //if method not "POST" send page with empty form values
           } else {
             return callback({
               title: 'Новая дисциплина',
@@ -105,15 +79,8 @@ module.exports = {
               errorMessage: ''
             }, 'disc_form', 0, 0);
           }
-        });
-      });
-    });
-  }
-}
-function convertToArray(element){
-  if(typeof element === 'string'){
-    return [element];
-  } else {
-    return element;
+        }); //getAllTeachers
+      }); // getAllGroups
+    }); //getRoleForAuthedUser
   }
 }
