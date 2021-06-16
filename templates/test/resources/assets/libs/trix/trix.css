@@ -380,3 +380,9 @@ trix-toolbar .trix-button-group--file-tools {
 trix-toolbar .trix-button-group--history-tools {
     display: none;
   }
+.trix-preview-file {
+  border: 1px solid red;
+}
+.trix-preview-image {
+  border: 1px solid green;
+}
