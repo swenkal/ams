@@ -67,7 +67,7 @@ html
                     label.form-control-label Основной текст
                       span.text-danger *
                     .input-group
-                      input#text(type='hidden', name='text', value=(newsDetail===undefined ? "" : newsDetail.text), rows="4" required, maxlength=1000)
+                      input#text(type='hidden', name='text', value=(newsDetail===undefined ? "" : newsDetail.text), rows="4" required)
                     trix-editor(input="text" style='min-height:150px;')
                   .row.mt-4
                     .col.form-group.mb-0
@@ -77,6 +77,7 @@ html
                         button.btn.btn-block.btn-secondary(type='button') Отмена
       .push
     include includes/footer.pug
+    script(src='../../../news_attachments.js') 
     script(src='../../../assets/libs/jquery/dist/jquery.min.js')
     script(src='../../../assets/libs/trix/trix.js')
     script(src='../../../assets/libs/bootstrap/dist/js/bootstrap.bundle.min.js')
