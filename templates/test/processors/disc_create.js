@@ -56,14 +56,28 @@ module.exports = {
                 postData.editors = funcs.checkAndAddEditors(userInfo, postData);
                 postData.groups = funcs.convertToArray(postData.groups);
 
-                dbMethods.addDisciplineToDB(userInfo, postData, db, err => {
+                dbMethods.findDisciplineByAllias(postData.allias, db, (err, discFound) => {
 
-                  if(err) return bw.redirectTo500Page(response, err, callback);
+                  if (err) return bw.redirectTo500Page(response, err, callback);
+                  if (discFound) {
+                    return callback({
+                      title: 'Новая дисциплина',
+                      discipline: postData,
+                      groupsInfo: groupsInfo,
+                      teachersList: teachersList,
+                      userInfo: userInfo,
+                      errorMessage: 'Дисциплина с таким URL уже существует!'
+                    }, 'disc_form', 0, 0 );
+                  }
 
-                  console.log(`Discipline ${postData.allias} created!`);
-                  return bw.redirectToDiscPage(response, callback);
-                });
+                  dbMethods.addDisciplineToDB(userInfo, postData, db, err => {
 
+                    if(err) return bw.redirectTo500Page(response, err, callback);
+
+                    console.log(`Discipline ${postData.allias} created!`);
+                    return bw.redirectToDiscPage(response, callback);
+                  });//addDisciplineToDB
+                }); //findDisciplineByAllias
               } catch(err) {
                 console.log(`Processor error disc_create: ${err}`);
                 return bw.redirectTo500Page(response, err, callback);

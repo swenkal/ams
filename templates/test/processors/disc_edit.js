@@ -81,14 +81,39 @@ module.exports = {
                 postData.editors = funcs.checkAndAddEditors(userInfo, postData);
                 postData.groups = funcs.convertToArray(postData.groups);
 
-                dbMethods.editDiscInDB(discAllias, userInfo, postData, db, err => {
+                //if discipline allias didn't change
+                if (discAllias == postData.allias) {
+                  return dbMethods.editDiscInDB(discAllias, userInfo, postData, db, err => {
+                    if (err) return bw.redirectTo500Page(response, err, callback);
+                    console.log(`Discipline ${discAllias} updated!`);
+
+                    return bw.redirectToDiscByAllias(response, discAllias, callback);
+                  });//editDiscInDB
+                }
+
+                // if disc allias will be changed - check this in db.
+                dbMethods.findDisciplineByAllias(postData.allias, db, (err, discFound) => {
+
                   if (err) return bw.redirectTo500Page(response, err, callback);
+                  if (discFound) {
+                    return callback({
+                      title: 'Новая дисциплина',
+                      discipline: postData,
+                      groupsInfo: groupsInfo,
+                      teachersList: teachersList,
+                      userInfo: userInfo,
+                      errorMessage: 'Дисциплина с таким URL уже существует!'
+                    }, 'disc_form', 0, 0 );
+                  }
+                  dbMethods.editDiscInDB(discAllias, userInfo, postData, db, err => {
+                    if (err) return bw.redirectTo500Page(response, err, callback);
 
-                  discAllias = postData.allias;
-                  console.log(`Discipline ${discAllias} updated!`);
+                    discAllias = postData.allias;
+                    console.log(`Discipline ${discAllias} updated!`);
 
-                  return bw.redirectToDiscByAllias(response, discAllias, callback);
-                });//editDiscInDB
+                    return bw.redirectToDiscByAllias(response, discAllias, callback);
+                  });//editDiscInDB
+                });//findDisciplineByAllias
 
               } catch(err) {
                 console.log(`Proccesor error disc_update: ${err}`);
