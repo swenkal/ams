@@ -1,139 +1,128 @@
 const qs = require('querystring'),
-      router = require('../../../router'),
-      security = require('../../../security');
+  downloadClientPostData = require('../../../router').downloadClientPostData,
+  check = require('./common/permission_check.js'),
+  bw = require('./common/bleed_wrapper.js'),
+  dbMethods = require('./disciplines/dbMethods.js'),
+  funcs = require('./disciplines/funcs.js');
 
 module.exports = {
   path: new RegExp('^\/disciplines\/edit\/[^\/]+\/$'),
-  processor: function(request, response, callback, sessionContext, sessionToken, db) {
-    if(sessionToken == null || sessionContext == undefined || sessionContext == null) {
-      callback();
-      return router.bleed(301, '/login/', response);
-    }
-    requestedUrl = decodeURI(request.url);
-    delimeteredUrl = requestedUrl.split('/');
-    disciplineAllias = delimeteredUrl[delimeteredUrl.length-2];
-    db.collection('users').findOne({_id : sessionContext.id}, {username : 1, securityRole: 1}, function(err, result) {
-      if(err) {
-        callback();
-        router.bleed(500, null, response, err);
-      }
+  processor(request, response, callback, sessionContext, sessionToken, db) {
+
+    const userAuthed = check.isUserAuthed(sessionContext, sessionToken);
+    if (!userAuthed) return bw.redirectToLoginPage(response, callback);
+
+    dbMethods.getRoleForAuthedUser(sessionContext.id, db, (err, result) => {
+
+      if (err) return bw.redirectTo500Page(response, err, callback);
       const userInfo = result;
-      if(userInfo.securityRole.length == 0 || (!userInfo.securityRole.includes('superadmin') && !userInfo.securityRole.includes('teacher'))){
-        callback();
-        return router.bleed(403, null, response);
+
+      const userAdminOrTeacher = check.isUserAdminOrTeacher(userInfo);
+      if (!userAdminOrTeacher) {
+        const err = new Error('User role not admin or teacher');
+        return bw.redirectWithErrorCode(response, 403, err, callback);
       }
-      db.collection('disciplines').findOne({allias: disciplineAllias}, function(err, result) {
-        if(err) {
-          callback();
-          router.bleed(500, null, response, err);
+
+      let discAllias = funcs.getDiscAlliasFromUrl(request.url);
+
+      dbMethods.findDisciplineByAllias(discAllias, db, (err, result) => {
+
+        if (err) return bw.redirectTo500Page(response, err, callback);
+        if (!result) return bw.redirectTo404Page(response, request.url, callback);
+
+        const discipline = result;
+
+        const teacherEditor = check.isTeacherDiscEditor(userInfo, discipline);
+        if (!teacherEditor) {
+          const err = new Error('Teacher is not discipline editor');
+          return bw.redirectWithErrorCode(response, 403, err, callback);
         }
-        if(result == null){
-          console.log(`Not found discipline '${disciplineAllias}' redirecting on disciplines list...`);
-          callback();
-          router.bleed(301, '/disciplines/', response);
-        }
-        const disc_detail = result;
-        db.collection('groups').find().toArray(function(err, result) {
-          if(err) {
-            callback();
-            router.bleed(500, null, response, err);
-          }
+
+        dbMethods.getAllGroups(db, (err, result) => {
+
+          if (err) return bw.redirectTo500Page(response, err, callback);
           const groupsInfo = result;
-          db.collection('users').find({securityRole: 'teacher'}).toArray(function(err, result) {
-            if(err) {
-              callback();
-              router.bleed(500, null, response, err);
-            }
+
+          dbMethods.getAllTeachers(db, (err, result) => {
+
+            if (err) return bw.redirectTo500Page(response, err, callback);
             const teachersList = result;
-            if(request.method == 'POST') {
-              return router.downloadClientPostData(request, function(err, data){
-                if(err) {
-                  callback();
-                  return router.bleed(500, null, response, err);
-                }
-                try {
-                  const postData = qs.parse(data);
-                  if(/[А-яЁё]/gi.test(postData.allias)){
-                    return callback({
-                      title: 'Изменение дисциплины',
-                      discipline: postData,
-                      groupsInfo: groupsInfo,
-                      userInfo: userInfo,
-                      teachersList: teachersList,
-                      errorMessage: 'Новое имя ссылки(URL) должно быть на английском!'
-                    }, 'disc_form', 0, 0 );
-                  }
-                  if(/\/|http|@|:|ftp/gi.test(postData.allias)){
-                    return callback({
-                      title: 'Изменение дисциплины',
-                      discipline: postData,
-                      groupsInfo: groupsInfo,
-                      userInfo: userInfo,
-                      teachersList: teachersList,
-                      errorMessage: 'Неправильное имя ссылки(URL) для дисциплины!'
-                    }, 'disc_form', 0, 0 );
-                  }
-                  let editors = [];
-                  if(userInfo.securityRole.includes('teacher')) {
-                    editors = convertToArray(disc_detail.editors);
-                  } else {
-                      editors = convertToArray(postData.editors);
-                  }
-                  db.collection('disciplines').findOneAndUpdate({allias: disciplineAllias}, { $set: {
-                    name: postData.name,
-                    mnemo: postData.mnemo,
-                    allias: postData.allias,
-                    description: postData.description,
-                    groups: convertToArray(postData.groups),
-                    dateUpdate: new Date(),
-                    lastEditor: userInfo._id,
-                    editors: editors
-                    }
-                  }, function(err, result){
-                    if(err) {
-                      callback();
-                      return router.bleed(500, null, response, err);
-                    }
-                    if(result.value == null) {
-                      return callback({
-                        title: 'Изменение дисциплины',
-                        discipline: postData,
-                        groupsInfo: groupsInfo,
-                        userInfo: userInfo,
-                        teachersList: teachersList,
-                        errorMessage: 'Что-то не так с обновлением, попробуйте снова.'
-                      }, 'disc_form', 0, 0 );
-                    }
-                    console.log(`Discipline ${postData.allias} updated!`);
-                    callback();
-                    return router.bleed(301, `/disciplines/${postData.allias}/`, response);
-                  });
-                } catch(err){
-                  console.log(`Proccesor error disc_update: ${err}`);
-                  callback();
-                  return router.bleed(500, null, response, err);
-                }
-              }, 10000000);
-            } else{
+
+            if (request.method !== 'POST') {
               return callback({
                 title: 'Изменение дисциплины',
-                discipline: disc_detail,
+                discipline: discipline,
                 groupsInfo: groupsInfo,
                 userInfo: userInfo,
                 teachersList: teachersList,
                 errorMessage: ''
               }, 'disc_form', 0, 0);
             }
-          });
-        });
-      });
-    });
+              //required from router.js for download Client Post Data
+            return downloadClientPostData(request, (err, data) => {
+              if (err) return bw.redirectTo400Page(response, callback);
+
+              try {
+                const postData = qs.parse(data);
+
+                const errorMessage = funcs.checkDiscAllias(postData.allias);
+                if (errorMessage) {
+                  return callback({
+                    title: 'Новая дисциплина',
+                    discipline: postData,
+                    groupsInfo: groupsInfo,
+                    teachersList: teachersList,
+                    userInfo: userInfo,
+                    errorMessage: errorMessage
+                  }, 'disc_form', 0, 0 );
+                }
+
+                //getting arrays for editors and groups
+                postData.editors = funcs.checkAndAddEditors(userInfo, postData);
+                postData.groups = funcs.convertToArray(postData.groups);
+
+                //if discipline allias didn't change
+                if (discAllias == postData.allias) {
+                  return dbMethods.editDiscInDB(discAllias, userInfo, postData, db, err => {
+                    if (err) return bw.redirectTo500Page(response, err, callback);
+                    console.log(`Discipline ${discAllias} updated!`);
+
+                    return bw.redirectToDiscByAllias(response, discAllias, callback);
+                  });//editDiscInDB
+                }
+
+                // if disc allias will be changed - check this in db.
+                dbMethods.findDisciplineByAllias(postData.allias, db, (err, discFound) => {
+
+                  if (err) return bw.redirectTo500Page(response, err, callback);
+                  if (discFound) {
+                    return callback({
+                      title: 'Новая дисциплина',
+                      discipline: postData,
+                      groupsInfo: groupsInfo,
+                      teachersList: teachersList,
+                      userInfo: userInfo,
+                      errorMessage: 'Дисциплина с таким URL уже существует!'
+                    }, 'disc_form', 0, 0 );
+                  }
+                  dbMethods.editDiscInDB(discAllias, userInfo, postData, db, err => {
+                    if (err) return bw.redirectTo500Page(response, err, callback);
+
+                    discAllias = postData.allias;
+                    console.log(`Discipline ${discAllias} updated!`);
+
+                    return bw.redirectToDiscByAllias(response, discAllias, callback);
+                  });//editDiscInDB
+                });//findDisciplineByAllias
+
+              } catch(err) {
+                console.log(`Proccesor error disc_update: ${err}`);
+                return bw.redirectTo500Page(response, err, callback);
+              }
+            }); //downloadClientPostData
+          }); //getAllTeachers
+        }); //getAllGroups
+      }); //findDisciplineByAllias
+    }); //getRoleForAuthedUser
   }
-}
-function convertToArray(element) {
-  if(typeof element === 'string'){
-    return [element];
-  } else{
-    return element;
-  }
-}
+};
